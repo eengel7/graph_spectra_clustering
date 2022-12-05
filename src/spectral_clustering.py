@@ -34,7 +34,10 @@ class Spectral_clustering:
 
     def compute_Laplacian(self) -> np.matrix:
         D_inv = np.linalg.inv(np.sqrt(self.D))
-        L = D_inv @ self.A @ D_inv           #infix operator that is designated to be used for matrix multiplication
+        # L = D_inv @ self.A @ D_inv           #infix operator that is designated to be used for matrix multiplication
+
+        L = np.dot(D_inv, self.A).dot(D_inv)
+
         return L
 
     def spectral_clustering(self, get_optimal_k: bool = True, k: int = 10) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -59,22 +62,38 @@ class Spectral_clustering:
     
         # returns eigenvalues and vectors in ascending order
         values, vectors = linalg.eigh(L)
+        k_optimal  = np.argmax(np.abs(np.diff(values))) + 1
+        print(f"The optimal number of clusters is {(len(values) - k_optimal) -1}.") 
 
         if get_optimal_k:
-            k = np.argmin(np.ediff1d(values)) + 1
-            
-
-        X = vectors[:, -k:]
+            k = k_optimal
+            X = vectors[:, k:]
+        else:
+            X = vectors[:, -k:]
         Y = X / np.linalg.norm(X, axis=1, keepdims=True)
         result = KMeans(n_clusters=k).fit(Y).labels_
 
-        # vectors of the laplacian for the fiedler
-        _, vectors = linalg.eigh(self.D-self.A)
+       
 
-        return result, vectors[:, 1], self.A
-    
+        return result, self.A
+
+    def compute_Fiedler(self):
+        ''' Compute the Fiedler vector of the Laplacian matrix L = D - A'''
+        A = nx.to_numpy_matrix(self.G)
+        D = np.diagflat(np.sum(A, axis=1))
+        laplace_mat = D - A
+        eigen_values, eigen_vecs = linalg.eigh(laplace_mat)
+        print(eigen_vecs)
+        return eigen_values, eigen_vecs[:, 1]
+
 if __name__ == '__main__':
+    import matplotlib.pyplot as plt 
     file = 'example1.dat'
     graph = read_graph(file)
     clustering = Spectral_clustering(graph)
-    print(clustering.spectral_clustering(get_optimal_k = False, k = 10))
+    clustering.spectral_clustering(get_optimal_k = False, k = 10)
+    _, fiedler = clustering.compute_Fiedler()
+    plt.plot(np.sort(fiedler))
+    plt.xlabel("Node")
+    plt.ylabel("Eigenvector")
+    plt.show()
